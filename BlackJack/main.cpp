@@ -164,11 +164,64 @@ public:
 		for (int i = 0; i < cards.size(); ++i)
 		{
 			sum += cards[i].GetValue();
-			if (cards[i].GetRank() == )
+			if (cards[i].GetRank() == Rank::Ace)
+			{
+				aces++;
+			}
 		}
+
+		while (sum > 21 && aces > 0)
+		{
+			sum -= 10;
+			aces--;
+		}
+		return aces > 0; // as jako 11 w rece
 	}
 
+	bool IsBust() const
+	{
+		return GetScore() > 21;
+	}
 
+	bool IsBlackjack() const
+	{
+		return cards.size() == 2 && GetScore() == 21;
+	}
+
+	bool CanSplit() const
+	{
+		return cards.size() == 2 && cards[0].GetValue() == cards[1].GetValue(); // 10 i face cardy mozna splitowac
+	}
+
+	int GetBet() const
+	{
+		return bet;
+	}
+
+	void SetBet(int b)
+	{
+		bet = b;
+	}
+
+	int Size() const
+	{
+		return cards.size();
+	}
+
+	const Card& GetCard(int i) const
+	{
+		return cards[i];
+	}
+
+	string ToString() const
+	{
+		string result;
+		for (int i = 0; i < cards.size(); ++i)
+		{
+			result += cards[i].ToString() + " ";
+		}
+		return result + "(" + to_string(GetScore()) + ")";
+	}
 };
 
 
