@@ -62,12 +62,12 @@ public:
 		string s;
 		switch (suit)
 		{
-			case Suit::Hearts: s = "Hearts"; break;
-				case Suit::Diamonds: s = "Diamonds"; break;
-					case Suit::Clubs: s = "Clubs"; break;
-						case Suit::Spades: s = "Spades"; break;
+			case Suit::Hearts: s = "Kier"; break;
+				case Suit::Diamonds: s = "Karo"; break;
+					case Suit::Clubs: s = "Trefl"; break;
+						case Suit::Spades: s = "Pik"; break;
 		}
-		return r + " of " + s;
+		return r + " " + s;
 	}
 };
 
@@ -114,6 +114,11 @@ public:
 	int CardsLeft() const
 	{
 		return cards.size();
+	}
+
+	int TotalCards() const
+	{
+		return numberOfDecks * 52;
 	}
 };
 
@@ -223,15 +228,40 @@ public:
 		return result + "(" + to_string(GetScore()) + ")";
 	}
 };
-
-class Player
+class Participant
 {
-private:
-	int chips;
+protected:
 	vector<Hand> hands;
 
 public:
-	Player(int startingChips)
+	int HandCount() const
+	{
+		return hands.size();
+	}
+
+	Hand& GetHand(int i)
+	{
+		return hands[i];
+	}
+
+	const Hand& GetHand(int i) const
+	{
+		return hands[i];
+	}
+
+	void ClearHands()
+	{
+		hands.clear();
+	}
+};
+
+class Gambler : public Participant
+{
+private:
+	int chips;
+
+public:
+	Gambler(int startingChips)
 	{
 		chips = startingChips;
 	}
@@ -251,21 +281,6 @@ public:
 		hands.clear();
 		hands.push_back(Hand(bet));
 		chips -= bet;
-	}
-
-	int HandCount() const
-	{
-		return hands.size();
-	}
-
-	Hand& GetHand(int i)
-	{
-		return hands[i];
-	}
-
-	const Hand& GetHand(int i) const
-	{
-		return hands[i];
 	}
 
 	bool DoubleDown(int handIndex)
@@ -309,25 +324,228 @@ public:
 	}
 };
 
+class Dealer : public Participant
+{
+public:
+	void StartRound()
+	{
+		hands.clear();
+		hands.push_back(Hand(0));
+	}
+	bool ShouldHit() const
+	{
+		return hands[0].GetScore() < 17;
+	}
+};
+
+class Game
+{
+private:
+	Deck deck;
+	Gambler player;
+	Dealer dealer;
+
+	void CheckDeck()
+	{
+		if (deck.CardsLeft() < deck.TotalCards() / 4)   // gdy zostanie mniej niz 25% kart - tasowanie
+		{
+			deck.Reset();
+			cout << "[Talia przetasowana]" << endl;
+		}
+	}
+
+	void ShowTable() const
+	{
+		cout << "\nDealer: " << dealer.GetHand(0).ToString() << endl;
+
+		for (int i = 0; i < player.HandCount(); ++i)
+		{
+			cout << "Twoja reka " << i + 1 << ": " << player.GetHand(i).ToString()
+				<< " zaklad: " << player.GetHand(i).GetBet() << endl;
+		}
+		cout << "Zetony: " << player.GetChips() << endl;
+	}
+
+	void PlayHand(int i)
+	{
+		while (true)
+		{
+			Hand& h = player.GetHand(i);
+
+			if (h.IsBust() || h.GetScore() == 21)
+			{
+				return;
+			}
+
+			ShowTable();
+			cout << "Twoja reka " << i + 1 << ": [h]it, [s]tand";
+			bool canDouble = h.Size() == 2 && player.CanAfford(h.GetBet());
+			bool canSplit = h.CanSplit() && player.CanAfford(h.GetBet());
+			if (canDouble) cout << ", [d]ouble down";
+			if (canSplit) cout << ", s[p]lit";
+			cout << ": ";
+
+			char choice;
+			cin >> choice;
+
+			if (choice == 'h')
+			{
+				h.AddCard(deck.Draw());
+			}
+			else if (choice == 's')
+			{
+				return;
+			}
+			else if (choice == 'd' && canDouble)
+			{
+				player.DoubleDown(i);
+				player.GetHand(i).AddCard(deck.Draw());
+				return;
+			}
+			else if (choice == 'p' && canSplit)
+			{
+				player.Split(i);
+				player.GetHand(i).AddCard(deck.Draw());
+				player.GetHand(player.HandCount() - 1).AddCard(deck.Draw());
+			}
+			else
+			{
+				cout << "Niepoprawny wybor" << endl;
+			}
+		}
+	}
+
+public:
+	Game(int decks, int startingChips) : deck(decks), player(startingChips) {}
+
+	bool PlayRound()
+	{
+		CheckDeck();
+
+		int bet;
+		do
+		{
+			cout << "\nZetony: " << player.GetChips() << ". Zaklad (0 = koniec): ";
+			cin >> bet;
+		} while (bet < 0 || !player.CanAfford(bet));
+
+		if (bet == 0)
+		{
+			return false;
+		}
+
+		player.StartRound(bet);
+		dealer.StartRound();
+
+		player.GetHand(0).AddCard(deck.Draw());
+		dealer.GetHand(0).AddCard(deck.Draw());
+		player.GetHand(0).AddCard(deck.Draw());
+
+		if (player.GetHand(0).IsBlackjack())
+		{
+			int bjValue = dealer.GetHand(0).GetCard(0).GetValue();
+
+			if (bjValue == 10 || bjValue == 11)
+			{
+				cout << "Dealer dobiera druga karte..." << endl;
+				dealer.GetHand(0).AddCard(deck.Draw());
+				ShowTable();
+
+				if (dealer.GetHand(0).IsBlackjack())
+				{
+					cout << "Dealer BlackJack: Push" << endl;
+					player.Pay(bet);
+				}
+				else
+				{
+					cout << "Blackjack! Wyplata 3:2" << endl;
+					player.Pay(bet * 5 / 2);
+				}
+			}
+			else
+			{
+				ShowTable();
+				cout << "Blackjack! Wyplata 3:2" << endl;
+				player.Pay(bet * 5 / 2);
+			}
+			return true;
+		}
+
+		for (int i = 0; i < player.HandCount(); ++i)
+		{
+			PlayHand(i);
+		}
+
+		bool anyAlive = false;
+		for (int i = 0; i < player.HandCount(); ++i)
+		{
+			if (!player.GetHand(i).IsBust())
+			{
+				anyAlive = true;
+			}
+		}
+
+		if (anyAlive)
+		{
+			dealer.GetHand(0).AddCard(deck.Draw());
+
+			while (dealer.ShouldHit())
+			{
+				dealer.GetHand(0).AddCard(deck.Draw());
+			}
+		}
+
+		ShowTable();
+
+		int dealerScore = dealer.GetHand(0).GetScore();
+		bool dealerBust = dealer.GetHand(0).IsBust();
+		bool dealerBJ = dealer.GetHand(0).IsBlackjack();
+
+		if (dealerBJ)
+		{
+			cout << "Dealer ma Blackjacka" << endl;
+		}
+
+		for (int i = 0; i < player.HandCount(); ++i)
+		{
+			const Hand& h = player.GetHand(i);
+			int bt = h.GetBet();
+			cout << "Reka " << i + 1 << ": ";
+
+			if (h.IsBust())
+			{
+				cout << "Bust, za duzo" << endl;
+			}
+			else if (dealerBJ)
+			{
+				cout << "przegrana, Blackjack dealera" << endl;
+			}
+			else if (dealerBust || h.GetScore() > dealerScore)
+			{
+				cout << "Wygrana!" << endl;
+				player.Pay(bt * 2);
+			}
+			else if (h.GetScore() == dealerScore)
+			{
+				cout << "Push" << endl;
+				player.Pay(bt);
+			}
+			else
+			{
+				cout << "przegrana" << endl;
+			}
+		}
+		return true;
+	}
+};
 
 int main()
 {
+	Game game(6, 1000);
+
+	while (game.PlayRound()){}
 	
-		Player p(1000);
-		p.StartRound(100);
-		cout << "Zetony: " << p.GetChips() << endl;   // 900
-
-		p.GetHand(0).AddCard(Card(Suit::Hearts, Rank::Eight));
-		p.GetHand(0).AddCard(Card(Suit::Spades, Rank::Eight));
-		cout << p.GetHand(0).ToString() << endl;       // 8H 8S (16)
-
-		if (p.Split(0))
-		{
-			cout << "Rece: " << p.HandCount() << endl;       // 2
-			cout << "Zetony: " << p.GetChips() << endl;      // 800
-			cout << p.GetHand(0).ToString() << endl;         // 8H (8)
-			cout << p.GetHand(1).ToString() << endl;         // 8S (8)
-		}
+	cout << "Koniec gry." << endl;
 
 
 	return 0;
