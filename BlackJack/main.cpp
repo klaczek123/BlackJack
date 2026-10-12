@@ -224,24 +224,110 @@ public:
 	}
 };
 
+class Player
+{
+private:
+	int chips;
+	vector<Hand> hands;
 
+public:
+	Player(int startingChips)
+	{
+		chips = startingChips;
+	}
+
+	int GetChips() const
+	{
+		return chips;
+	}
+
+	bool CanAfford(int amount) const
+	{
+		return amount <= chips;
+	}
+
+	void StartRound(int bet)
+	{
+		hands.clear();
+		hands.push_back(Hand(bet));
+		chips -= bet;
+	}
+
+	int HandCount() const
+	{
+		return hands.size();
+	}
+
+	Hand& GetHand(int i)
+	{
+		return hands[i];
+	}
+
+	const Hand& GetHand(int i) const
+	{
+		return hands[i];
+	}
+
+	bool DoubleDown(int handIndex)
+	{
+		int extra = hands[handIndex].GetBet();
+		if (!CanAfford(extra))
+		{
+			return false;
+		}
+
+		chips -= extra;
+		hands[handIndex].SetBet(extra * 2);
+		return true;
+	}
+
+	bool Split(int handIndex)
+	{
+		Hand& h = hands[handIndex];
+		int bet = h.GetBet();
+
+		if (!h.CanSplit() || !CanAfford(bet))
+		{
+			return false;
+		}
+
+		Card second = h.GetCard(1);
+		Hand first(bet);
+		first.AddCard(h.GetCard(0));
+		Hand other(bet);
+		other.AddCard(second);
+
+		hands[handIndex] = first;
+		hands.push_back(other);
+		chips -= bet;
+		return true;
+	}
+
+	void Pay(int amount)
+	{
+		chips += amount;
+	}
+};
 
 
 int main()
 {
-	Deck deck(1);
-	cout << "Kart w talii: " << deck.CardsLeft() << endl;
+	
+		Player p(1000);
+		p.StartRound(100);
+		cout << "Zetony: " << p.GetChips() << endl;   // 900
 
-	for (int i = 0; i < 5; ++i)
-	{
-		Card c = deck.Draw();
-		cout << c.ToString() << endl;
-	}
+		p.GetHand(0).AddCard(Card(Suit::Hearts, Rank::Eight));
+		p.GetHand(0).AddCard(Card(Suit::Spades, Rank::Eight));
+		cout << p.GetHand(0).ToString() << endl;       // 8H 8S (16)
 
-	cout << "Kart po dobraniu: " << deck.CardsLeft() << endl;
-
-	Deck big(6);
-	cout << "Kart w 6 taliach: " << big.CardsLeft() << endl;
+		if (p.Split(0))
+		{
+			cout << "Rece: " << p.HandCount() << endl;       // 2
+			cout << "Zetony: " << p.GetChips() << endl;      // 800
+			cout << p.GetHand(0).ToString() << endl;         // 8H (8)
+			cout << p.GetHand(1).ToString() << endl;         // 8S (8)
+		}
 
 
 	return 0;
